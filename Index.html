@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b0e11">
+    <title>Rocket Social Online</title>
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+    <style>
+        :root { --bg: #0b0e11; --card: #151921; --primary: #3b82f6; --text: #ffffff; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 80px; }
+        .header { background: rgba(11,14,17,0.9); backdrop-filter: blur(10px); padding: 15px; position: sticky; top: 0; z-index: 1000; display: flex; justify-content: space-between; border-bottom: 1px solid #333; }
+        .container { max-width: 500px; margin: auto; padding: 15px; }
+        .page { display: none; }
+        .active { display: block; }
+        .card { background: var(--card); border-radius: 16px; margin-bottom: 20px; border: 1px solid #2d3748; overflow: hidden; }
+        .card img { width: 100%; height: auto; display: block; }
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: #151921; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #333; }
+        .nav-item { border: none; background: none; color: #9ca3af; text-align: center; cursor: pointer; flex: 1; }
+        .active-nav { color: var(--primary); }
+        input, textarea { width: 100%; background: #000; border: 1px solid #333; color: white; padding: 12px; border-radius: 8px; margin: 10px 0; box-sizing: border-box; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 10px; width: 100%; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <span style="font-weight: bold; color: var(--primary);">ROCKET SOCIAL ONLINE</span>
+        <button onclick="sair()" style="background:none; border:none; color:white;">⚙️</button>
+    </div>
+
+    <div id="p-login" class="page active">
+        <div class="container">
+            <h1>Decolagem Online 🚀</h1>
+            <input id="email" type="email" placeholder="E-mail">
+            <input id="password" type="password" placeholder="Senha">
+            <button class="btn-main" onclick="login()">ENTRAR</button>
+        </div>
+    </div>
+
+    <div id="p-feed" class="page">
+        <div class="container" id="feed-list"></div>
+    </div>
+
+    <div id="p-post" class="page">
+        <div class="container">
+            <h2>Novo Post ➕</h2>
+            <textarea id="p-text" placeholder="Como foi feito?"></textarea>
+            <input type="file" id="p-img">
+            <button class="btn-main" onclick="criarPost()">PUBLICAR</button>
+        </div>
+    </div>
+
+    <nav class="nav-bar" id="nb" style="display:none;">
+        <button class="nav-item active-nav" onclick="nav('p-feed', this)">🏠<br>Home</button>
+        <button class="nav-item" onclick="nav('p-post', this)">➕<br>Postar</button>
+        <button class="nav-item" onclick="sair()">🚪<br>Sair</button>
+    </nav>
+
+    <script>
+        const { Client, Account, Databases, Storage, ID } = Appwrite;
+        const MY_ID = "69ee057f0005b430901d";
+        const client = new Client().setEndpoint("https://cloud.appwrite.io/v1").setProject(MY_ID);
+        const account = new Account(client);
+        const databases = new Databases(client);
+        const storage = new Storage(client);
+
+        function nav(pId, el) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
+            document.getElementById(pId).classList.add('active');
+            el.classList.add('active-nav');
+            if(pId === 'p-feed') carregar();
+        }
+
+        async function login() {
+            try {
+                await account.createEmailPasswordSession(document.getElementById('email').value, document.getElementById('password').value);
+                location.reload();
+            } catch(e) { alert(e.message); }
+        }
+
+        async function init() {
+            try {
+                await account.get();
+                document.getElementById('p-login').classList.remove('active');
+                document.getElementById('p-feed').classList.add('active');
+                document.getElementById('nb').style.display = 'flex';
+                carregar();
+            } catch(e) {}
+        }
+        init();
+
+        async function criarPost() {
+            const f = document.getElementById('p-img').files[0];
+            const t = document.getElementById('p-text').value;
+            try {
+                const up = await storage.createFile(MY_ID, ID.unique(), f);
+                await databases.createDocument(MY_ID, "Posts", ID.unique(), { text: t, imageID: up.$id, likes: 0 });
+                alert("Postado!");
+                location.reload();
+            } catch(e) { alert(e.message); }
+        }
+
+        async function carregar() {
+            const list = document.getElementById('feed-list');
+            try {
+                const res = await databases.listDocuments(MY_ID, "Posts");
+                list.innerHTML = "";
+                res.documents.reverse().forEach(d => {
+                    const img = storage.getFileView(MY_ID, d.imageID);
+                    list.innerHTML += `<div class="card"><img src="${img}"><div style="padding:15px;">${d.text}</div></div>`;
+                });
+            } catch(e) { list.innerHTML = "Erro ao carregar."; }
+        }
+
+        async function sair() {
+            await account.deleteSession('current');
+            location.reload();
+        }
+    </script>
+</body>
+</html>
